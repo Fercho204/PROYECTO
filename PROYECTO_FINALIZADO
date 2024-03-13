@@ -1,0 +1,1294 @@
+// PROYECTO_Fernando_Palomo_22357
+// PROYECTO finalizado
+;------------------------------------------------------------------------------
+; Encabezado
+;------------------------------------------------------------------------------
+; Universidad del valle de Guatemala
+; IE2023 Programación de Microcontroladores
+; Author : Fernando José Pérez Palomo - 22357
+; Proyecto: Proyecto1.asm
+; Descripción: RELOJ FORMATO 24H / FECHA AÑO BISIESTO / ALARMA ACTIVADA Y DESACTIVADA
+; Hardware: ATMega328P 
+
+.include "M328PDEF.inc"   ; Incluye el archivo de definiciones para el ATmega328P
+
+.cseg                      ; Sección de código
+.org 0x00                  ; Origen del vector de reinicio
+    JMP SETUP              ; Salto a la etiqueta SETUP
+.org 0x0008                ; Origen del vector de interrupción externa INT0
+    JMP ISR_PCINT0
+.org 0x0020                ; Origen del vector de interrupción del Timer/Counter0 overflow
+    JMP TIMER0_OVR
+
+TABLA7SEG: .DB 0b0100_0000, 0b0111_1001, 0b0010_0100, 0b0011_0000, 0b0001_1001, 0b0001_0010, 0b0000_0010, 0b0111_1000, 0b0000_0000, 0b0001_1000 ; Tabla de 7 segmentos
+
+SETUP:
+    ; Configuración de la pila y otras inicializaciones aquí
+
+    ; Configuración del prescaler para 16 MHz / 16 = 1 MHz
+    LDI R16, (1 << CLKPCE)   ; Habilita la escritura en el registro de prescaler
+    STS CLKPR, R16            ; Almacena el valor en el registro de prescaler
+    LDI R16, 0b0000_0110       ; Configura el prescaler para 250000 Hz (CONFIGURARLO BIEN)
+    STS CLKPR, R16            ; Almacena la configuración del prescaler
+
+    ; Configuración de puertos
+    LDI R16, 0b0000_0000       ; Inicializa R16 con 0
+    OUT PORTD, R16            ; Configura el puerto D como salida
+    STS UCSR0B, R16           ; Deshabilita el módulo USART
+    LDI R16, 0b1111_1111      ; Configura R16 para la configuración de pines de entrada en DDRC
+    OUT DDRC, R16             ; Configuramos los pines como entrada
+    LDI R16, 0b0011_0011       ; Configura R16 para habilitar pull-up en los botones en PORTC
+    OUT PORTC, R16            ; Habilita pull-up en los botones
+    LDI R16, 0b1111_1111       ; Configura R16 para todos los pines de salida en DDRD
+    OUT DDRD, R16             ; Configuramos los pines como salida
+    LDI R16, 0b1111_1111       ; Configura R16 para todos los pines de salida en DDRB
+    OUT DDRB, R16             ; Configuramos los pines como salida
+    CALL Timer0              ; Llama a la configuración del 
+    LDI R16, 0b0000_0011       ; Configura R16 para los pines habilitados en PCMSK1
+    STS PCMSK1, R16           ; Configura el registro de máscara de cambio de pin para habilitar interrupciones en PCINT
+    LDI R16, (1 << PCIE1)     ; Configura R16 para habilitar interrupciones en PCIE1
+    STS PCICR, R16            ; Habilita las interrupciones de cambio de pin para el puerto C
+    LDI R16, (1 << TOIE0)     ; Configura R16 para habilitar interrupciones por desbordamiento en Timer0
+    STS TIMSK0, R16           ; Habilita la interrupción por desbordamiento en Timer0
+    SEI                       ; Habilita las interrupciones globales
+
+	LDI R31, 0
+	LDI R17, 2
+	LDI R18, 0
+	LDI R19, 0                ; Inicializa R19 con 0
+	LDI R20, 0
+	LDI R22, 0
+	LDI R23, 2
+	LDI R24, 9				  ; Inicializa R24 con 0
+	LDI R25, 0
+	LDI R26, 5
+	LDI R27, 3
+	LDI R28, 0
+	LDI R21, 1
+	LDI R29, 0
+	MOV R3, R29
+	MOV R4, R29
+	MOV R5, R29
+	// R21, R29, R31 libres
+	
+
+LOOPCOMPAREMODE:
+	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+	CPI R20, 0
+	BREQ LOOPRELOJDEF
+	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+	CPI R20, 1
+	BREQ LOOPMINS
+	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+	CPI R20, 2
+	BREQ LOOPHORAS
+	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+	CPI R20, 3
+	BREQ LOOPFECHA
+	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+	CPI R20, 4
+	BREQ LOOPMESES 
+	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+	CPI R20, 5
+	BREQ LOOPDIAS
+	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+	CPI R20, 6
+	BREQ LOOPALARMA
+	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+	CPI R20, 7
+	BREQ LOOPALARMAMINS
+	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+	CPI R20, 8
+	BREQ LOOPALARMAHORAS
+	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+	CPI R20, 9
+	BREQ LOOPDESALARMA
+	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+	RJMP LOOPCOMPAREMODE
+
+LOOPRELOJDEF:
+	RJMP LOOPRELOJDEFX
+LOOPMINS:
+	RJMP LOOPMINSX
+LOOPHORAS:
+	RJMP LOOPHORASX
+LOOPFECHA:
+	RJMP LOOPFECHAX
+LOOPDIAS:
+	RJMP LOOPDIASX
+LOOPMESES:
+	RJMP LOOPMESESX
+LOOPALARMA:
+	RJMP LOOPALARMAX
+LOOPALARMAMINS:
+	RJMP LOOPALARMAMINSX
+LOOPALARMAHORAS:
+	RJMP LOOPALARMAHORASX
+LOOPDESALARMA:
+	RJMP LOOPDESALARMAX
+
+LOOPRELOJDEFX:
+	CALL ALARMA_ACIVA
+    LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R26					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+	OR R1, R25
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0000_0011         ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	LDI R30, 0b0000_1000
+	OUT PORTB, R30
+	CALL DELAY
+	LDI R30, 0b0000_0000
+	OUT PORTB, R30
+	CLR ZL
+	
+	CLR R1
+    LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R24                  ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+	OR R1, R25
+    OUT PORTD, R1               ; Muestra el valor en el puerto D SEGUNDO DISPLAY
+    LDI R30, 0b0011_0011         ; Carga R29 con el valor binario 0000_1011
+    OUT PORTC, R30               ; Muestra el valor de R29 en el puerto C
+	LDI R30, 0b0001_0000
+	OUT PORTB, R30
+	CALL DELAY
+	LDI R30, 0b0000_0000
+	OUT PORTB, R30
+	CLR ZL
+
+	CLR R1
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R27					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+	OR R1, R25
+    OUT PORTD, R1                ; Muestra el valor en el puerto D
+    LDI R30, 0b0000_1011         ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CALL DELAY
+	LDI R30, 0b0000_0011         ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CLR ZL
+
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R17					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+	OR R1, R25
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0000_0111         ; Carga R30 con el valor binario 0000_0011
+	OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CALL DELAY
+	LDI R30, 0b0000_0011         ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CLR ZL
+    RJMP LOOPCOMPAREMODE                   ; Salto incondicional de nuevo al bucle LOOPRELOJDEF
+
+ALARMA_ACIVA:
+CP R5, R26
+BREQ ALARMA_ACTIVA1
+RET
+ALARMA_ACTIVA1:
+CP R4, R24
+BREQ ALARMA_ACTIVA2
+RET
+ALARMA_ACTIVA2:
+CP R3, 27
+BREQ ALARMA_ACTIVA3
+RET
+ALARMA_ACTIVA3:
+CP R22, 17
+BREQ ALARMA_ACTIVA4
+RET
+ALARMA_ACTIVA4:
+SBI PINB, PB2
+RET
+//*****************************************************************************************************************************
+// HORA DEFAULT
+//*****************************************************************************************************************************
+TIMER0_OVR:
+    INC R19                        ; Incrementa el contador
+	CPI R25, 0b1000_0000
+	BREQ DISPLEDS1
+	SBRS R25, 7
+	SBR R25, (1 << 7)
+	RJMP TIMER0_OVR1
+DISPLEDS1:	
+	CLR R25
+
+TIMER0_OVR1:
+    CPI R19, 120                   ; Compara si el contador ha alcanzado el límite 120 número = 1 segundo
+    BREQ DISP_RESET                ; Salta a la etiqueta DISP_RESET si el contador ha alcanzado el límite
+    RJMP CONTINUE_COUNT            ; Salta a la etiqueta CONTINUE_COUNT
+
+DISP_RESET:
+	LDI R25, 0b0000_0000
+    CLR R19                     ; Reinicia el contador
+    INC R24                        ; Incrementa R24 (variable de control)
+    CPI R24, 10                     ; Compara si R24 ha alcanzado el límite
+    BREQ DISP_RESET2               ; Salta a la etiqueta DISP_RESET2 si R24 ha alcanzado el límite
+    RETI                           ; Retorna de la interrupción
+
+DISP_RESET2:
+    LDI R24, 0                     ; Reinicia R24
+	INC R26
+	CPI R26, 6                     ; Compara si R24 ha alcanzado el límite
+    BREQ DISP_RESET3   
+    RETI                           ; Retorna de la interrupción
+
+DISP_RESET3:
+	LDI R26, 0
+	CPI R27, 3
+	BREQ DISP_RESET5
+	CPI R27, 10
+	BREQ DISP_RESET4
+	INC R27
+	RETI
+
+DISP_RESET4:
+	INC R17
+	CLR R27
+	RETI
+
+DISP_RESET5:
+	CPI R17, 2
+	BREQ DISP_RESET6
+	RETI
+
+DISP_RESET6:
+	CLR R17
+	CLR R27
+	RETI
+
+CONTINUE_COUNT:
+    SBI TIFR0, TOV0                 ; Limpia la bandera de overflow del Timer/Counter0
+	LDI R16, 134                    ; Carga el valor de desbordamiento
+    OUT TCNT0, R16                  ; Carga el valor inicial del contador
+    RETI                            ; Retorna de la interrupción
+
+LOOPMINSX:
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R26					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+	OR R1, R25
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	LDI R30, 0b0000_1000
+	OUT PORTB, R30
+	CALL DELAY
+	LDI R30, 0b0000_0000
+	OUT PORTB, R30
+	CLR ZL
+	
+	CLR R1
+    LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R24                  ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+	OR R1, R25
+    OUT PORTD, R1               ; Muestra el valor en el puerto D SEGUNDO DISPLAY
+    LDI R30, 0b0011_0011         ; Carga R29 con el valor binario 0000_1011
+    OUT PORTC, R30               ; Muestra el valor de R29 en el puerto C
+	LDI R30, 0b0001_0000
+	OUT PORTB, R30
+	CALL DELAY
+	LDI R30, 0b0000_0000
+	OUT PORTB, R30
+	CLR ZL
+	CLR R1
+	IN R16, PINC            ; Lee el puerto C
+    SBRS R16, PC4           ; Compara si el bit con el puerto PC0 está en 1, va a Disp7seg_positivo
+    RJMP DISPOVERMINS
+    SBRS R16, PC5           ; Compara si el bit con el puerto PC1 está en 1, va a Disp7seg_negativo
+    RJMP DISPUNDERMINS
+	RJMP LOOPCOMPAREMODE
+
+DISPOVERMINS:
+    ; Antirrebote
+    LDI R16, 100            ; Inicializa el contador de antirrebote
+    delay_disp_pos:
+        DEC R16              ; Decrementa el contador
+        BRNE delay_disp_pos  ; Salta si el contador no ha llegado a cero
+        SBIS PINC, PC4       ; Lee nuevamente el pin, salta si el bit PC0 está en 1
+        RJMP DISPOVERMINS
+    CALL DISP_RESETMINSOVER			; Llama a la subrutina contador_leds
+	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
+
+DISPUNDERMINS:
+    
+    LDI R16, 100            ; Inicializa el contador de antirrebote
+    delay_disp_neg:
+        DEC R16						; Decrementa el contador
+        BRNE delay_disp_neg			; Salta si el contador no ha llegado a cero
+        SBIS PINC, PC5				; Lee nuevamente el pin, salta si el bit PC1 está en 1
+        RJMP DISPUNDERMINS
+    CALL DISP_RESETMINSUNDER		; Llama a la subrutina contador_leds
+	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
+
+DISP_RESETMINSUNDER:
+	LDI R25, 0b0000_0000
+    LDI R19, 9                     ; Reinicia el contador
+	CPI R24, 0                     ; Compara si R24 ha alcanzado el límite
+    BREQ DISP_RESET2MINSUNDER      ; Salta a la etiqueta DISP_RESET2 si R24 ha alcanzado el límite
+    DEC R24                        ; Incrementa R24 (variable de control)
+    RET							   ; Retorna de la interrupción
+
+DISP_RESET2MINSUNDER:
+    LDI R24, 9                     ; Reinicia R24
+	CPI R26, 0                     ; Compara si R24 ha alcanzado el límite
+    BREQ DISP_RESET3MINSUNDER   
+	DEC R26
+    RET                           ; Retorna de la interrupción
+
+DISP_RESET3MINSUNDER:
+	LDI R26, 5
+	RET
+
+DISP_RESETMINSOVER:
+	
+	LDI R25, 0b0000_0000
+    LDI R19, 0                     ; Reinicia el contador
+    CPI R24, 9                     ; Compara si R24 ha alcanzado el límite
+    BREQ DISP_RESET2MINSOVER               ; Salta a la etiqueta DISP_RESET2 si R24 ha alcanzado el límite
+	INC R24                        ; Incrementa R24 (variable de control)
+    RET                           ; Retorna de la interrupción
+
+DISP_RESET2MINSOVER:
+    LDI R24, 0                     ; Reinicia R24
+	CPI R26, 5                     ; Compara si R24 ha alcanzado el límite
+    BREQ DISP_RESET3MINSOVER   
+	INC R26
+    RET                           ; Retorna de la interrupción
+
+DISP_RESET3MINSOVER:
+	LDI R26, 0
+	RET
+
+LOOPHORASX:
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R27					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+	OR R1, R25
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0011_1011         ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CALL DELAY
+	LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CLR ZL
+
+	CLR R1
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R17					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+	OR R1, R25
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0011_0111         ; Carga R30 con el valor binario 0000_0011
+	OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CALL DELAY
+	LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CLR ZL
+	CLR R1
+	IN R16, PINC            ; Lee el puerto C
+    SBRS R16, PC4           ; Compara si el bit con el puerto PC0 está en 1, va a Disp7seg_positivo
+    RJMP DISPOVERHORAS
+    SBRS R16, PC5           ; Compara si el bit con el puerto PC1 está en 1, va a Disp7seg_negativo
+    RJMP DISPUNDERHORAS
+	RJMP LOOPCOMPAREMODE
+
+DISPOVERHORAS:
+    ; Antirrebote
+    LDI R16, 100            ; Inicializa el contador de antirrebote
+    delay_disp_pos1:
+        DEC R16              ; Decrementa el contador
+        BRNE delay_disp_pos1  ; Salta si el contador no ha llegado a cero
+        SBIS PINC, PC4       ; Lee nuevamente el pin, salta si el bit PC0 está en 1
+        RJMP DISPOVERHORAS
+    CALL DISP_RESETHORASOVER			; Llama a la subrutina contador_leds
+	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
+
+DISPUNDERHORAS:
+    
+    LDI R16, 100            ; Inicializa el contador de antirrebote
+    delay_disp_neg1:
+        DEC R16						; Decrementa el contador
+        BRNE delay_disp_neg1			; Salta si el contador no ha llegado a cero
+        SBIS PINC, PC5				; Lee nuevamente el pin, salta si el bit PC1 está en 1
+        RJMP DISPUNDERHORAS
+    CALL DISP_RESETHORASUNDER		; Llama a la subrutina contador_leds
+	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
+
+DISP_RESETHORASUNDER:
+	CPI R27, 0
+	BREQ DISP_RESET5HORASUNDER
+	DEC R27
+	RET
+
+DISP_RESET5HORASUNDER:
+	CPI R17, 2
+	BREQ DISP_RESET4HORASUNDER
+	CPI R17, 1
+	BREQ DISP_RESET7HORASUNDER
+	CPI R17, 0
+	BREQ  DISP_RESET6HORASUNDER
+	RET
+
+DISP_RESET4HORASUNDER:
+	LDI R27, 9
+	LDI R17, 1
+	RET
+
+DISP_RESET7HORASUNDER:
+	LDI R27, 9
+	LDI R17, 0
+	RET
+
+DISP_RESET6HORASUNDER:
+	LDI R27, 2
+	LDI R17, 2
+
+DISP_RESETHORASOVER:
+	CPI R27, 3
+	BREQ DISP_RESET5HORASOVER
+	CPI R27, 9
+	BREQ DISP_RESET4HORASOVER
+	INC R27
+	RET
+
+DISP_RESET4HORASOVER:
+	INC R17
+	CLR R27
+	RET
+DISP_RESET5HORASOVER:
+	CPI R17, 2
+	BREQ DISP_RESET6HORASOVER
+	INC R27
+	RET
+
+DISP_RESET6HORASOVER:
+	LDI R17, 0
+	LDI R27, 0
+	RET
+
+LOOPFECHAX:
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R21					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	LDI R30, 0b0011_1011         ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CALL DELAY
+	LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CLR ZL
+	
+	CLR R1
+    LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R29                  ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D SEGUNDO DISPLAY
+    LDI R30, 0b0011_0011         ; Carga R29 con el valor binario 0000_1011
+    OUT PORTC, R30               ; Muestra el valor de R29 en el puerto C
+	LDI R30, 0b0011_0111         ; Carga R30 con el valor binario 0000_0011
+	OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CALL DELAY
+	LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CLR ZL
+	CLR R1
+
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R23					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+	LDI R30, 0b0001_0011
+	OUT PORTB, R30
+	CALL DELAY
+	LDI R30, 0b0000_0011
+	OUT PORTB, R30
+	CLR ZL
+
+	CLR R1
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R28					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+	LDI R30, 0b0000_1000
+	OUT PORTB, R30
+	CALL DELAY
+	LDI R30, 0b0000_0000
+	OUT PORTB, R30
+	CLR ZL
+	CLR R1
+	RJMP LOOPCOMPAREMODE
+LOOPDIASX:
+	// R21, R29, R31 libres
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R21					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	LDI R30, 0b0011_1011         ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CALL DELAY
+	LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CLR ZL
+	
+	CLR R1
+    LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R29                  ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D SEGUNDO DISPLAY
+    LDI R30, 0b0011_0011         ; Carga R29 con el valor binario 0000_1011
+    OUT PORTC, R30               ; Muestra el valor de R29 en el puerto C
+	LDI R30, 0b0011_0111         ; Carga R30 con el valor binario 0000_0011
+	OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CALL DELAY
+	LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CLR ZL
+	CLR R1
+	IN R16, PINC            ; Lee el puerto C
+    SBRS R16, PC4           ; Compara si el bit con el puerto PC0 está en 1, va a Disp7seg_positivo
+    RJMP DISPOVERDIAS
+    SBRS R16, PC5           ; Compara si el bit con el puerto PC1 está en 1, va a Disp7seg_negativo
+    RJMP DISPUNDERDIAS
+	RJMP LOOPCOMPAREMODE
+
+	DISPOVERDIAS:
+    ; Antirrebote
+    LDI R16, 100            ; Inicializa el contador de antirrebote
+    delay_disp_pos4:
+        DEC R16              ; Decrementa el contador
+        BRNE delay_disp_pos4  ; Salta si el contador no ha llegado a cero
+        SBIS PINC, PC4       ; Lee nuevamente el pin, salta si el bit PC0 está en 1
+        RJMP DISPOVERDIAS
+    CALL DISP_RESETDIASOVER			; Llama a la subrutina contador_leds
+	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
+
+DISPUNDERDIAS:
+    LDI R16, 100            ; Inicializa el contador de antirrebote
+    delay_disp_neg5:
+        DEC R16						; Decrementa el contador
+        BRNE delay_disp_neg5			; Salta si el contador no ha llegado a cero
+        SBIS PINC, PC5				; Lee nuevamente el pin, salta si el bit PC1 está en 1
+        RJMP DISPUNDERDIAS
+    CALL DISP_RESETDIASUNDER		; Llama a la subrutina contador_leds
+	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
+
+// R23 DECENAS DE MESES R28 UNIDADES DE MESES
+DISP_RESETDIASUNDER:
+	CPI R28, 0
+	BREQ DISP_RESET_DIAS_UNDER1
+	CPI R28, 1
+	BREQ DISP_RESET_DIAS_UNDER2
+
+DISP_RESET_DIAS_UNDER1:
+	CPI R23, 1
+	BREQ DISP_RESET_31DIAS_UNDER
+	CPI R23, 2
+	BREQ DISP_RESET_29DIAS_UNDER
+	CPI R23, 3
+	BREQ DISP_RESET_31DIAS_UNDER
+	CPI R23, 4
+	BREQ DISP_RESET_30DIAS_UNDER
+	CPI R23, 5
+	BREQ DISP_RESET_31DIAS_UNDER
+	CPI R23, 6
+	BREQ DISP_RESET_30DIAS_UNDER
+	CPI R23, 7
+	BREQ DISP_RESET_31DIAS_UNDER
+	CPI R23, 8
+	BREQ DISP_RESET_31DIAS_UNDER
+	CPI R23, 9
+	BREQ DISP_RESET_30DIAS_UNDER
+	RET
+
+DISP_RESET_DIAS_UNDER2:
+	CPI R23, 0
+	BREQ DISP_RESET_31DIAS_UNDER
+	CPI R23, 1
+	BREQ DISP_RESET_30DIAS_UNDER
+	CPI R23, 2
+	BREQ DISP_RESET_31DIAS_UNDER
+
+//*************************************************************************************************************************
+//VERIFICACIÓN DE MES
+//*************************************************************************************************************************
+DISP_RESET_30DIAS_UNDER:
+	CPI R29, 0
+	BREQ SETEAR30_3
+	DEC R21
+	CPI R21, 0xFF
+	BREQ SETEAR30
+	RET
+	SETEAR30:
+	LDI R21, 9
+	DEC R29
+	CPI R29, 0xFF
+	BREQ SETEAR30_2
+	RET
+	SETEAR30_3:
+	CPI R21, 1
+	BREQ SETEAR30_2
+	DEC R21
+	RET
+	SETEAR30_2:
+	LDI R21, 0
+	LDI R29, 3
+	RET
+
+DISP_RESET_31DIAS_UNDER:
+	CPI R29, 0
+	BREQ SETEAR31_3
+	DEC R21
+	CPI R21, 0xFF
+	BREQ SETEAR31
+	RET
+	SETEAR31:
+	LDI R21, 9
+	DEC R29
+	CPI R29, 0xFF
+	BREQ SETEAR31_2
+	RET
+	SETEAR31_3:
+	CPI R21, 1
+	BREQ SETEAR31_2
+	DEC R21
+	RET
+	SETEAR31_2:
+	LDI R21, 1
+	LDI R29, 3
+	RET
+
+DISP_RESET_29DIAS_UNDER:
+	CPI R29, 0
+	BREQ SETEAR29_3
+	DEC R21
+	CPI R21, 0xFF
+	BREQ SETEAR29
+	RET
+	SETEAR29:
+	LDI R21, 9
+	DEC R29
+	CPI R29, 0xFF
+	BREQ SETEAR29_2
+	RET
+	SETEAR29_3:
+	CPI R21, 1
+	BREQ SETEAR29_2
+	DEC R21
+	RET
+	SETEAR29_2:
+	LDI R21, 9
+	LDI R29, 2
+	RET
+
+
+
+//**************************************************************************************************************************
+DISP_RESETDIASOVER:
+	CPI R28, 0
+	BREQ DISP_RESET_DIAS_OVER1
+	CPI R28, 1
+	BREQ DISP_RESET_DIAS_OVER2
+
+DISP_RESET_DIAS_OVER1:
+	CPI R23, 1
+	BREQ DISP_RESET_31DIAS_OVER
+	CPI R23, 2
+	BREQ DISP_RESET_29DIAS_OVER
+	CPI R23, 3
+	BREQ DISP_RESET_31DIAS_OVER
+	CPI R23, 4
+	BREQ DISP_RESET_30DIAS_OVER
+	CPI R23, 5
+	BREQ DISP_RESET_31DIAS_OVER
+	CPI R23, 6
+	BREQ DISP_RESET_30DIAS_OVER
+	CPI R23, 7
+	BREQ DISP_RESET_31DIAS_OVER
+	CPI R23, 8
+	BREQ DISP_RESET_31DIAS_OVER
+	CPI R23, 9
+	BREQ DISP_RESET_30DIAS_OVER
+	RET
+
+DISP_RESET_DIAS_OVER2:
+	CPI R23, 0
+	BREQ DISP_RESET_31DIAS_OVER
+	CPI R23, 1
+	BREQ DISP_RESET_30DIAS_OVER
+	CPI R23, 2
+	BREQ DISP_RESET_31DIAS_OVER
+
+//*************************************************************************************************************************
+//VERIFICACIÓN DE MES
+//*************************************************************************************************************************
+DISP_RESET_31DIAS_OVER:
+	CPI R29, 3
+	BREQ DISP_RESET_31DIAS1_OVER
+	CPI R21, 9
+	BREQ DISP_RESET_31DIAS1_OVER
+	INC R21
+	RET
+
+DISP_RESET_31DIAS1_OVER:
+	CPI R21, 1
+	BREQ DISP_RESET_31DIAS2_OVER
+	CPI R29, 3
+	BREQ DISP_RESET_31DIAS2_OVER
+	LDI R21, 0
+	INC R29
+	RET
+
+DISP_RESET_31DIAS2_OVER:
+	CPI R21, 1
+	BREQ DISP_RESET_31DIAS4_OVER
+	LDI R21, 1
+	LDI R29, 3
+	RET
+
+DISP_RESET_31DIAS4_OVER:
+	LDI R21, 1
+	CLR R29
+	RET
+
+DISP_RESET_29DIAS_OVER:
+	CPI R29, 3
+	BREQ DISP_RESET_31DIAS1_OVER
+	CPI R21, 9
+	BREQ DISP_RESET_29DIAS1_OVER
+	INC R21
+	RET
+
+DISP_RESET_29DIAS1_OVER:
+	CPI R29, 2
+	BREQ DISP_RESET_29DIAS2_OVER
+	LDI R21, 0
+	INC R29
+	RET
+
+DISP_RESET_29DIAS2_OVER:
+	LDI R21, 1
+	CLR R29
+	RET
+
+DISP_RESET_30DIAS_OVER:
+	CPI R29, 3
+	BREQ DISP_RESET_30DIAS1_OVER
+	CPI R21, 9
+	BREQ DISP_RESET_30DIAS1_OVER
+	INC R21
+	RET
+
+DISP_RESET_30DIAS1_OVER:
+	CPI R21, 0
+	BREQ DISP_RESET_30DIAS2_OVER
+	CPI R29, 3
+	BREQ DISP_RESET_30DIAS2_OVER
+	LDI R21, 0
+	INC R29
+	RET
+
+DISP_RESET_30DIAS2_OVER:
+	LDI R21, 1
+	CLR R29
+	RET
+
+LOOPMESESX:
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R23					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+	LDI R30, 0b0001_0011
+	OUT PORTB, R30
+	CALL DELAY
+	LDI R30, 0b0000_0011
+	OUT PORTB, R30
+	CLR ZL
+
+	CLR R1
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R28					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+	LDI R30, 0b0000_1000
+	OUT PORTB, R30
+	CALL DELAY
+	LDI R30, 0b0000_0000
+	OUT PORTB, R30
+	CLR ZL
+	CLR R1
+	IN R16, PINC            ; Lee el puerto C
+    SBRS R16, PC4           ; Compara si el bit con el puerto PC0 está en 1, va a Disp7seg_positivo
+    RJMP DISPOVERMESES
+    SBRS R16, PC5           ; Compara si el bit con el puerto PC1 está en 1, va a Disp7seg_negativo
+    RJMP DISPUNDERMESES
+	RJMP LOOPCOMPAREMODE
+
+DISPOVERMESES:
+    ; Antirrebote
+    LDI R16, 100            ; Inicializa el contador de antirrebote
+    delay_disp_pos3:
+        DEC R16              ; Decrementa el contador
+        BRNE delay_disp_pos3  ; Salta si el contador no ha llegado a cero
+        SBIS PINC, PC4       ; Lee nuevamente el pin, salta si el bit PC0 está en 1
+        RJMP DISPOVERMESES
+    CALL DISP_RESETMESESOVER			; Llama a la subrutina contador_leds
+	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
+
+DISPUNDERMESES:
+    
+    LDI R16, 100            ; Inicializa el contador de antirrebote
+    delay_disp_neg3:
+        DEC R16						; Decrementa el contador
+        BRNE delay_disp_neg3			; Salta si el contador no ha llegado a cero
+        SBIS PINC, PC5				; Lee nuevamente el pin, salta si el bit PC1 está en 1
+        RJMP DISPUNDERMESES
+    CALL DISP_RESETMESESUNDER		; Llama a la subrutina contador_leds
+	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
+
+DISP_RESETMESESUNDER:
+	LDI R21, 1
+	CLR R29
+	CPI R23, 1
+	BREQ DISP_RESET5MESESUNDER
+	CPI R23, 0
+	BREQ DISP_RESET8MESESUNDER
+	DEC R23
+	RET
+
+DISP_RESET5MESESUNDER:
+	CPI R28, 1
+	BREQ DISP_RESET7MESESUNDER
+	CPI R28, 0
+	BREQ  DISP_RESET6MESESUNDER
+	RET
+
+DISP_RESET7MESESUNDER:
+	LDI R23, 0
+	LDI R28, 1
+	RET
+
+DISP_RESET8MESESUNDER:
+	LDI R23, 9
+	LDI R28, 0
+	RET
+
+DISP_RESET6MESESUNDER:
+	LDI R23, 1
+	LDI R28, 1
+
+DISP_RESETMESESOVER:
+	LDI R21, 1
+	CLR R29
+	CPI R23, 2
+	BREQ DISP_RESET5MESESOVER
+	CPI R23, 9
+	BREQ DISP_RESET4MESESOVER
+	INC R23
+	RET
+
+DISP_RESET4MESESOVER:
+	INC R28
+	CLR R23
+	RET
+
+DISP_RESET5MESESOVER:
+	CPI R28, 1
+	BREQ DISP_RESET6MESESOVER
+	INC R23
+	RET
+
+DISP_RESET6MESESOVER:
+	LDI R28, 0
+	LDI R23, 1
+	RET
+
+LOOPALARMAX:
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R5					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	LDI R30, 0b0000_1000
+	OUT PORTB, R30
+	CALL DELAY
+	LDI R30, 0b0000_0000
+	OUT PORTB, R30
+	CLR ZL
+	
+	CLR R1
+    LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R4                  ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D SEGUNDO DISPLAY
+    LDI R30, 0b0011_0011         ; Carga R29 con el valor binario 0000_1011
+    OUT PORTC, R30               ; Muestra el valor de R29 en el puerto C
+	LDI R30, 0b0001_0000
+	OUT PORTB, R30
+	CALL DELAY
+	LDI R30, 0b0000_0000
+	OUT PORTB, R30
+	CLR ZL
+	CLR R1
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R3					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0011_1011         ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CALL DELAY
+	LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CLR ZL
+
+	CLR R1
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R22					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0011_0111         ; Carga R30 con el valor binario 0000_0011
+	OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CALL DELAY
+	LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CLR ZL
+	CLR R1
+	RJMP LOOPCOMPAREMODE                   ; Salto incondicional de nuevo al bucle LOOPRELOJDEF
+
+LOOPALARMAMINSX:
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R5					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	LDI R30, 0b0000_1000
+	OUT PORTB, R30
+	CALL DELAY
+	LDI R30, 0b0000_0000
+	OUT PORTB, R30
+	CLR ZL
+	
+	CLR R1
+    LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R4                  ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D SEGUNDO DISPLAY
+    LDI R30, 0b0011_0011         ; Carga R29 con el valor binario 0000_1011
+    OUT PORTC, R30               ; Muestra el valor de R29 en el puerto C
+	LDI R30, 0b0001_0000
+	OUT PORTB, R30
+	CALL DELAY
+	LDI R30, 0b0000_0000
+	OUT PORTB, R30
+	CLR ZL
+	CLR R1
+	IN R16, PINC            ; Lee el puerto C
+    SBRS R16, PC4           ; Compara si el bit con el puerto PC0 está en 1, va a Disp7seg_positivo
+    RJMP DISPOVERMINSA
+    SBRS R16, PC5           ; Compara si el bit con el puerto PC1 está en 1, va a Disp7seg_negativo
+    RJMP DISPUNDERMINSA
+	RJMP LOOPCOMPAREMODE
+
+DISPOVERMINSA:
+    ; Antirrebote
+    LDI R16, 100            ; Inicializa el contador de antirrebote
+    delay_disp_pos7:
+        DEC R16              ; Decrementa el contador
+        BRNE delay_disp_pos7  ; Salta si el contador no ha llegado a cero
+        SBIS PINC, PC4       ; Lee nuevamente el pin, salta si el bit PC0 está en 1
+        RJMP DISPOVERMINSA
+    CALL DISP_RESETMINSOVERA			; Llama a la subrutina contador_leds
+	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
+
+DISPUNDERMINSA:
+    LDI R16, 100            ; Inicializa el contador de antirrebote
+    delay_disp_neg7:
+        DEC R16						; Decrementa el contador
+        BRNE delay_disp_neg7			; Salta si el contador no ha llegado a cero
+        SBIS PINC, PC5				; Lee nuevamente el pin, salta si el bit PC1 está en 1
+        RJMP DISPUNDERMINSA
+    CALL DISP_RESETMINSUNDERA		; Llama a la subrutina contador_leds
+	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
+
+DISP_RESETMINSUNDERA:
+	MOV R31, R5
+	CPI R31, 0
+	BREQ SETEARM_3A
+	DEC R4
+	MOV R31, R4
+	CPI R31, 0xFF
+	BREQ SETEARMA
+	RET
+	SETEARMA:
+	LDI R31, 9
+	MOV R4, R31
+	DEC R5
+	MOV R31, R5
+	CPI R31, 0xFF
+	BREQ SETEARM_2A
+	RET
+	SETEARM_3A:
+	MOV R31, R4
+	CPI R31, 0
+	BREQ SETEARM_2A
+	DEC R4
+	RET
+	SETEARM_2A:
+	LDI R31, 9
+	MOV R4, R31
+	LDI R31, 5
+	MOV R5, R31
+	RET
+
+DISP_RESETMINSOVERA:
+	MOV R31, R5
+	CPI R31, 5
+	BREQ SETEARM_3AO
+	INC R4
+	MOV R31, R4
+	CPI R31, 10
+	BREQ SETEARMAO
+	RET
+	SETEARMAO:
+	LDI R31, 0
+	MOV R4, R31
+	INC R5
+	MOV R31, R5
+	CPI R31, 10
+	BREQ SETEARM_2AO
+	RET
+	SETEARM_3AO:
+	MOV R31, R4
+	CPI R31, 9
+	BREQ SETEARM_2AO
+	INC R4
+	RET
+	SETEARM_2AO:
+	LDI R31, 0
+	MOV R4, R31
+	LDI R31, 0
+	MOV R5, R31
+	RET
+
+LOOPALARMAHORASX:
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R3					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0011_1011         ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CALL DELAY
+	LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CLR ZL
+
+	CLR R1
+	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R22					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0011_0111         ; Carga R30 con el valor binario 0000_0011
+	OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CALL DELAY
+	LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
+	CLR ZL
+	CLR R1
+	IN R16, PINC            ; Lee el puerto C
+    SBRS R16, PC4           ; Compara si el bit con el puerto PC0 está en 1, va a Disp7seg_positivo
+    RJMP DISPOVERHORASA
+    SBRS R16, PC5           ; Compara si el bit con el puerto PC1 está en 1, va a Disp7seg_negativo
+    RJMP DISPUNDERHORASA
+	RJMP LOOPCOMPAREMODE
+
+DISPOVERHORASA:
+    ; Antirrebote
+    LDI R16, 100            ; Inicializa el contador de antirrebote
+    delay_disp_pos6:
+        DEC R16              ; Decrementa el contador
+        BRNE delay_disp_pos6  ; Salta si el contador no ha llegado a cero
+        SBIS PINC, PC4       ; Lee nuevamente el pin, salta si el bit PC0 está en 1
+        RJMP DISPOVERHORASA
+    CALL DISP_RESETHORASOVERA			; Llama a la subrutina contador_leds
+	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
+
+DISPUNDERHORASA:
+    
+    LDI R16, 100            ; Inicializa el contador de antirrebote
+    delay_disp_neg6:
+        DEC R16						; Decrementa el contador
+        BRNE delay_disp_neg6			; Salta si el contador no ha llegado a cero
+        SBIS PINC, PC5				; Lee nuevamente el pin, salta si el bit PC1 está en 1
+        RJMP DISPUNDERHORASA
+    CALL DISP_RESETHORASUNDERA		; Llama a la subrutina contador_leds
+	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
+
+DISP_RESETHORASUNDERA:
+	CPI R22, 0
+	BREQ SETEAR_3A
+	DEC R3
+	MOV R31, R3
+	CPI R31, 0xFF
+	BREQ SETEARA
+	RET
+	SETEARA:
+	LDI R31, 9
+	MOV R3, R31
+	DEC R22
+	CPI R22, 0xFF
+	BREQ SETEAR_2A
+	RET
+	SETEAR_3A:
+	MOV R31, R3
+	CPI R31, 0
+	BREQ SETEAR_2A
+	DEC R3
+	RET
+	SETEAR_2A:
+	LDI R31, 3
+	MOV R3, R31
+	LDI R22, 2
+	RET
+
+DISP_RESETHORASOVERA: 
+	CPI R22, 2
+	BREQ SETEAR_3AO
+	INC R3
+	MOV R31, R3
+	CPI R31, 10
+	BREQ SETEARAO
+	RET
+	SETEARAO:
+	LDI R31, 0
+	MOV R3, R31
+	INC R22
+	CPI R22, 10
+	BREQ SETEAR_2AO
+	RET
+	SETEAR_3AO:
+	MOV R31, R3
+	CPI R31, 3
+	BREQ SETEAR_2AO
+	INC R3
+	RET
+	SETEAR_2AO:
+	LDI R31, 0
+	MOV R3, R31
+	LDI R22, 0
+	RET
+
+LOOPDESALARMAX:	//DESACTIVAR ALARMA
+	SBI PINB, PB0
+	SBI PINB, PB1
+	SBI PINB, PB2
+	CP R5, R26
+	BRNE ALARMA_ACTIVA1
+	RJMP LOOPCOMPAREMODE
+	ALARMA_ACTIVA1DES:
+	CP R4, R24
+	BRNE ALARMA_ACTIVA2
+	RJMP LOOPCOMPAREMODE
+	ALARMA_ACTIVA2DES:
+	CP R3, 27
+	BRNE ALARMA_ACTIVA3
+	RJMP LOOPCOMPAREMODE
+	ALARMA_ACTIVA3DES:
+	CP R22, 17
+	BRNE ALARMA_ACTIVA4
+	RJMP LOOPCOMPAREMODE
+	ALARMA_ACTIVA4DES:
+	SBI PINB, PB2
+	RJMP LOOPCOMPAREMODE
+	
+ISR_PCINT0:
+    PUSH R16                      ; Almacena R16 en la pila
+    IN R16, SREG                  ; Lee el registro de estado y almacena en R16
+    PUSH R16                      ; Almacena R16 en la pila
+
+    IN R18, PINC                   ; Lee el estado actual de los pines del puerto C
+    SBRS R18, PC0                   ; Salta si el bit PC0 ha cambiado
+    RJMP CHECKPC1                  ; Salta a la etiqueta CHECKPC1
+    SBRS R18, PC1                   ; Salta si el bit PC1 ha cambiado
+    RJMP CHECKPC0                  ; Salta a la etiqueta CHECKPC0
+    RJMP CHANGEMODE                    ; Salta a la etiqueta CHANGEMODE si no se cumplen las condiciones anteriores
+
+CHECKPC1:
+	CPI R20, 0
+	BREQ RESETCHANGEMODEUNDER
+    SBRS R18, PC1                  ; Salta si el bit PC1 ha cambiado
+    JMP CHANGEMODE                     ; Salta a la etiqueta CHANGEMODE
+    DEC R20                        ; Decrementa R20 (variable de control)
+    RJMP CHANGEMODE                    ; Salta a la etiqueta CHANGEMODE
+
+CHECKPC0:
+	CPI R20, 9
+	BREQ RESETCHANGEMODEOVER
+    SBRS R18, PC0                  ; Salta si el bit PC0 ha cambiado
+    JMP CHANGEMODE                     ; Salta a la etiqueta CHANGEMODE
+    INC R20                        ; Incrementa R20 (variable de control)
+    RJMP CHANGEMODE                    ; Salta a la etiqueta CHANGEMODE
+
+CHANGEMODE:
+    SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+    POP R16                        ; Restaura R16 desde la pila
+    OUT SREG, R16                  ; Restaura el registro de estado desde R16
+    POP R16                        ; Restaura R16 desde la pila
+    RETI                            ; Retorna de la interrupción
+
+RESETCHANGEMODEUNDER:
+	LDI R20, 9
+	RETI
+
+RESETCHANGEMODEOVER:
+	LDI R20, 0
+	RETI
+
+; Inicio de Timer 0
+Timer0:	
+    LDI R16, (1 << CS02) | (1 << CS00)  ; Configura el prescaler a 1024
+    OUT TCCR0B, R16   
+    LDI R16, 134                           ; Carga el valor de desbordamiento
+    OUT TCNT0, R16                          ; Carga el valor inicial del contador
+    RET                                   ; Retorna de la subrutina
+
+DELAY:
+    LDI R16, 100            ; Inicializa delay
+    delay1:
+        DEC R16              ; Decrementa el contador
+		CPI R16, 0
+        BRNE delay1  ; Salta si el contador no ha llegado a cero
+		RET
