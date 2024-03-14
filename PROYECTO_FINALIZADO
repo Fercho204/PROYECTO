@@ -52,27 +52,28 @@ SETUP:
     STS TIMSK0, R16           ; Habilita la interrupción por desbordamiento en Timer0
     SEI                       ; Habilita las interrupciones globales
 
-	LDI R31, 0
-	LDI R17, 2
-	LDI R18, 0
-	LDI R19, 0                ; Inicializa R19 con 0
-	LDI R20, 0
-	LDI R22, 0
-	LDI R23, 2
-	LDI R24, 9				  ; Inicializa R24 con 0
-	LDI R25, 0
-	LDI R26, 5
-	LDI R27, 3
-	LDI R28, 0
-	LDI R21, 1
-	LDI R29, 0
-	MOV R3, R29
-	MOV R4, R29
-	MOV R5, R29
-	// R21, R29, R31 libres
+	LDI R31, 0       ; Carga el registro R31 con el valor 0
+	LDI R17, 2       ; Carga el registro R17 con el valor 2
+	LDI R18, 0       ; Carga el registro R18 con el valor 0
+	LDI R19, 0       ; Carga el registro R19 con el valor 0 
+	LDI R20, 0       ; Carga el registro R20 con el valor 0
+	LDI R22, 0       ; Carga el registro R22 con el valor 0
+	LDI R23, 2       ; Carga el registro R23 con el valor 2
+	LDI R24, 9       ; Carga el registro R24 con el valor 9 (unidades de minutos)
+	LDI R25, 0       ; Carga el registro R25 con el valor 0
+	LDI R26, 5       ; Carga el registro R26 con el valor 5 (decenas de minutos)
+	LDI R27, 3       ; Carga el registro R27 con el valor 3
+	LDI R28, 0       ; Carga el registro R28 con el valor 0
+	LDI R21, 1       ; Carga el registro R21 con el valor 1
+	LDI R29, 0       ; Carga el registro R29 con el valor 0
+	MOV R3, R29      ; Mueve el contenido del registro R29 al registro R3
+	MOV R4, R29      ; Mueve el contenido del registro R29 al registro R4
+	MOV R5, R29      ; Mueve el contenido del registro R29 al registro R5
+
 	
 
 LOOPCOMPAREMODE:
+	CALL ALARMA_ACTIVA			   ; Llamar subrutina para encender alarma o no
 	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
 	CPI R20, 0
 	BREQ LOOPRELOJDEF
@@ -104,6 +105,7 @@ LOOPCOMPAREMODE:
 	CPI R20, 9
 	BREQ LOOPDESALARMA
 	SBI PCIFR, PCIF1               ; Limpia la bandera de interrupción del cambio de pin para el puerto C
+	LDI R20, 9
 	RJMP LOOPCOMPAREMODE
 
 LOOPRELOJDEF:
@@ -128,97 +130,105 @@ LOOPDESALARMA:
 	RJMP LOOPDESALARMAX
 
 LOOPRELOJDEFX:
-	CALL ALARMA_ACIVA
     LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
     LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
-    ADD ZL, R26					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R26                 ; Suma R26 al byte bajo de la dirección de la tabla de 7 segmentos
     LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
-	OR R1, R25
+    OR R1, R25                  ; Realiza una operación OR con R1 y R25
     OUT PORTD, R1               ; Muestra el valor en el puerto D
-    LDI R30, 0b0000_0011         ; Carga R30 con el valor binario 0000_0111
-    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
-	LDI R30, 0b0000_1000
-	OUT PORTB, R30
-	CALL DELAY
-	LDI R30, 0b0000_0000
-	OUT PORTB, R30
-	CLR ZL
-	
-	CLR R1
+    LDI R30, 0b0000_0011        ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30              ; Muestra el valor de R30 en el puerto C
+    LDI R30, 0b0000_1000        ; Carga R30 con el valor binario 0000_1000
+    OUT PORTB, R30              ; Muestra el valor de R30 en el puerto B
+    CALL DELAY                  ; Llama a una función de retardo
+    LDI R30, 0b0000_0000        ; Carga R30 con el valor binario 0000_0000
+    OUT PORTB, R30              ; Muestra el valor de R30 en el puerto B
+    CLR ZL                      ; Borra el registro ZL (byte bajo del puntero Z)
+
+    CLR R1                      ; Borra el registro R1
     LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
     LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
-    ADD ZL, R24                  ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R24                  ; Suma R24 al byte bajo de la dirección de la tabla de 7 segmentos
     LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
-	OR R1, R25
-    OUT PORTD, R1               ; Muestra el valor en el puerto D SEGUNDO DISPLAY
-    LDI R30, 0b0011_0011         ; Carga R29 con el valor binario 0000_1011
-    OUT PORTC, R30               ; Muestra el valor de R29 en el puerto C
-	LDI R30, 0b0001_0000
-	OUT PORTB, R30
-	CALL DELAY
-	LDI R30, 0b0000_0000
-	OUT PORTB, R30
-	CLR ZL
+    OR R1, R25                  ; Realiza una operación OR con R1 y R25
+    OUT PORTD, R1               ; Muestra el valor en el puerto D (SEGUNDO DISPLAY)
+    LDI R30, 0b0011_0011        ; Carga R30 con el valor binario 0011_0011
+    OUT PORTC, R30              ; Muestra el valor de R30 en el puerto C
+    LDI R30, 0b0001_0000        ; Carga R30 con el valor binario 0001_0000
+    OUT PORTB, R30              ; Muestra el valor de R30 en el puerto B
+    CALL DELAY                  ; Llama a una función de retardo
+    LDI R30, 0b0000_0000        ; Carga R30 con el valor binario 0000_0000
+    OUT PORTB, R30              ; Muestra el valor de R30 en el puerto B
+    CLR ZL                      ; Borra el registro ZL (byte bajo del puntero Z)
 
-	CLR R1
-	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    CLR R1                      ; Borra el registro R1
+    LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
     LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
-    ADD ZL, R27					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R27                 ; Suma R27 al byte bajo de la dirección de la tabla de 7 segmentos
     LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
-	OR R1, R25
-    OUT PORTD, R1                ; Muestra el valor en el puerto D
-    LDI R30, 0b0000_1011         ; Carga R30 con el valor binario 0000_0111
-    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
-	CALL DELAY
-	LDI R30, 0b0000_0011         ; Carga R30 con el valor binario 0000_0011
-    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
-	CLR ZL
-
-	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
-    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
-    ADD ZL, R17					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
-    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
-	OR R1, R25
+    OR R1, R25                  ; Realiza una operación OR con R1 y R25
     OUT PORTD, R1               ; Muestra el valor en el puerto D
-    LDI R30, 0b0000_0111         ; Carga R30 con el valor binario 0000_0011
-	OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
-	CALL DELAY
-	LDI R30, 0b0000_0011         ; Carga R30 con el valor binario 0000_0011
-    OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
-	CLR ZL
-    RJMP LOOPCOMPAREMODE                   ; Salto incondicional de nuevo al bucle LOOPRELOJDEF
+    LDI R30, 0b0000_1011        ; Carga R30 con el valor binario 0000_1011
+    OUT PORTC, R30              ; Muestra el valor de R30 en el puerto C
+    CALL DELAY                  ; Llama a una función de retardo
+    LDI R30, 0b0000_0011        ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30              ; Muestra el valor de R30 en el puerto C
+    CLR ZL                      ; Borra el registro ZL (byte bajo del puntero Z)
 
-ALARMA_ACIVA:
-CP R5, R26
-BREQ ALARMA_ACTIVA1
-RET
+    LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
+    LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R17                 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
+    OR R1, R25                  ; Realiza una operación OR con R1 y R25
+    OUT PORTD, R1               ; Muestra el valor en el puerto D
+    LDI R30, 0b0000_0111        ; Carga R30 con el valor binario 0000_0111
+    OUT PORTC, R30              ; Muestra el valor de R30 en el puerto C
+    CALL DELAY                  ; Llama a una función de retardo
+    LDI R30, 0b0000_0011        ; Carga R30 con el valor binario 0000_0011
+    OUT PORTC, R30              ; Muestra el valor de R30 en el puerto C
+    CLR ZL                      ; Borra el registro ZL (byte bajo del puntero Z)
+    RJMP LOOPCOMPAREMODE        ; Salto incondicional de nuevo al bucle LOOPRELOJDEF
+
+ALARMA_ACTIVA:
+CP R5, R26        ; Compara el contenido de R5 con R26
+BREQ ALARMA_ACTIVA1  ; Salta a ALARMA_ACTIVA1 si son iguales
+RET                  ; Retorna si no son iguales
+
 ALARMA_ACTIVA1:
-CP R4, R24
-BREQ ALARMA_ACTIVA2
-RET
+CP R4, R24        ; Compara el contenido de R4 con R24
+BREQ ALARMA_ACTIVA2  ; Salta a ALARMA_ACTIVA2 si son iguales
+RET                  ; Retorna si no son iguales
+
 ALARMA_ACTIVA2:
-CP R3, 27
-BREQ ALARMA_ACTIVA3
-RET
+CP R3, R27        ; Compara el contenido de R3 con R27
+BREQ ALARMA_ACTIVA3  ; Salta a ALARMA_ACTIVA3 si son iguales
+RET                  ; Retorna si no son iguales
+
 ALARMA_ACTIVA3:
-CP R22, 17
-BREQ ALARMA_ACTIVA4
-RET
+CP R22, R17       ; Compara el contenido de R22 con R17
+BREQ ALARMA_ACTIVA4  ; Salta a ALARMA_ACTIVA4 si son iguales
+RET                  ; Retorna si no son iguales
+
 ALARMA_ACTIVA4:
-SBI PINB, PB2
-RET
+SBI PINB, PB2     ; Establece el bit PB2 en el registro PINB
+RET               ; Retorna
+
 //*****************************************************************************************************************************
 // HORA DEFAULT
 //*****************************************************************************************************************************
 TIMER0_OVR:
     INC R19                        ; Incrementa el contador
-	CPI R25, 0b1000_0000
-	BREQ DISPLEDS1
-	SBRS R25, 7
-	SBR R25, (1 << 7)
-	RJMP TIMER0_OVR1
-DISPLEDS1:	
-	CLR R25
+
+    CPI R25, 0b1000_0000          ; Compara R25 con 1000 0000 en binario
+    BREQ DISPLEDS1                ; Salta a DISPLEDS1 si son iguales
+
+    SBRS R25, 7                   ; Salta si el bit 7 de R25 está limpio
+    SBR R25, (1 << 7)             ; Establece el bit 7 de R25
+    RJMP TIMER0_OVR1              ; Salta a TIMER0_OVR1
+
+DISPLEDS1:                        ; Etiqueta DISPLEDS1
+    CLR R25                       ; Borra el contenido de R25
+
 
 TIMER0_OVR1:
     CPI R19, 120                   ; Compara si el contador ha alcanzado el límite 120 número = 1 segundo
@@ -226,43 +236,44 @@ TIMER0_OVR1:
     RJMP CONTINUE_COUNT            ; Salta a la etiqueta CONTINUE_COUNT
 
 DISP_RESET:
-	LDI R25, 0b0000_0000
-    CLR R19                     ; Reinicia el contador
-    INC R24                        ; Incrementa R24 (variable de control)
-    CPI R24, 10                     ; Compara si R24 ha alcanzado el límite
-    BREQ DISP_RESET2               ; Salta a la etiqueta DISP_RESET2 si R24 ha alcanzado el límite
-    RETI                           ; Retorna de la interrupción
+	LDI R25, 0b0000_0000      ; Carga R25 con el valor binario 0000 0000
+    CLR R19                    ; Reinicia el contador
+    INC R24                    ; Incrementa R24 (variable de control)
+    CPI R24, 10               ; Compara si R24 ha alcanzado el límite
+    BREQ DISP_RESET2         ; Salta a DISP_RESET2 si R24 ha alcanzado el límite
+    RETI                      ; Retorna de la interrupción
 
 DISP_RESET2:
-    LDI R24, 0                     ; Reinicia R24
-	INC R26
-	CPI R26, 6                     ; Compara si R24 ha alcanzado el límite
+    LDI R24, 0                 ; Reinicia R24
+	INC R26                    ; Incrementa R26
+	CPI R26, 6                 ; Compara si R26 ha alcanzado el límite
     BREQ DISP_RESET3   
-    RETI                           ; Retorna de la interrupción
+    RETI                       ; Retorna de la interrupción
 
 DISP_RESET3:
-	LDI R26, 0
-	CPI R27, 3
-	BREQ DISP_RESET5
-	CPI R27, 10
-	BREQ DISP_RESET4
-	INC R27
-	RETI
+	LDI R26, 0                 ; Reinicia R26
+	CPI R27, 3                 ; Compara si R27 es igual a 3
+	BREQ DISP_RESET5           ; Salta a DISP_RESET5 si es igual
+	CPI R27, 10                ; Compara si R27 es igual a 10
+	BREQ DISP_RESET4           ; Salta a DISP_RESET4 si es igual
+	INC R27                    ; Incrementa R27
+	RETI                       ; Retorna de la interrupción
 
 DISP_RESET4:
-	INC R17
-	CLR R27
-	RETI
+	INC R17                    ; Incrementa R17
+	CLR R27                    ; Reinicia R27
+	RETI                       ; Retorna de la interrupción
 
 DISP_RESET5:
-	CPI R17, 2
-	BREQ DISP_RESET6
-	RETI
+	CPI R17, 2                 ; Compara si R17 es igual a 2
+	BREQ DISP_RESET6           ; Salta a DISP_RESET6 si es igual
+	RETI                       ; Retorna de la interrupción
 
 DISP_RESET6:
-	CLR R17
-	CLR R27
-	RETI
+	CLR R17                    ; Reinicia R17
+	CLR R27                    ; Reinicia R27
+	RETI                       ; Retorna de la interrupción
+
 
 CONTINUE_COUNT:
     SBI TIFR0, TOV0                 ; Limpia la bandera de overflow del Timer/Counter0
@@ -279,10 +290,10 @@ LOOPMINSX:
     OUT PORTD, R1               ; Muestra el valor en el puerto D
     LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0111
     OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
-	LDI R30, 0b0000_1000
+	LDI R30, 0b0000_1001
 	OUT PORTB, R30
 	CALL DELAY
-	LDI R30, 0b0000_0000
+	LDI R30, 0b0000_0001
 	OUT PORTB, R30
 	CLR ZL
 	
@@ -295,10 +306,10 @@ LOOPMINSX:
     OUT PORTD, R1               ; Muestra el valor en el puerto D SEGUNDO DISPLAY
     LDI R30, 0b0011_0011         ; Carga R29 con el valor binario 0000_1011
     OUT PORTC, R30               ; Muestra el valor de R29 en el puerto C
-	LDI R30, 0b0001_0000
+	LDI R30, 0b0001_0001
 	OUT PORTB, R30
 	CALL DELAY
-	LDI R30, 0b0000_0000
+	LDI R30, 0b0000_0001
 	OUT PORTB, R30
 	CLR ZL
 	CLR R1
@@ -428,61 +439,64 @@ DISPUNDERHORAS:
 	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
 
 DISP_RESETHORASUNDER:
-	CPI R27, 0
-	BREQ DISP_RESET5HORASUNDER
-	DEC R27
-	RET
+	CPI R27, 0                   ; Compara si R27 es igual a 0
+	BREQ DISP_RESET5HORASUNDER   ; Salta a DISP_RESET5HORASUNDER si es igual
+	DEC R27                      ; Decrementa R27
+	RET                           ; Retorna de la subrutina
 
 DISP_RESET5HORASUNDER:
-	CPI R17, 2
-	BREQ DISP_RESET4HORASUNDER
-	CPI R17, 1
-	BREQ DISP_RESET7HORASUNDER
-	CPI R17, 0
-	BREQ  DISP_RESET6HORASUNDER
-	RET
+	CPI R17, 2                   ; Compara si R17 es igual a 2
+	BREQ DISP_RESET4HORASUNDER   ; Salta a DISP_RESET4HORASUNDER si es igual
+	CPI R17, 1                   ; Compara si R17 es igual a 1
+	BREQ DISP_RESET7HORASUNDER   ; Salta a DISP_RESET7HORASUNDER si es igual
+	CPI R17, 0                   ; Compara si R17 es igual a 0
+	BREQ DISP_RESET6HORASUNDER   ; Salta a DISP_RESET6HORASUNDER si es igual
+	RET                           ; Retorna de la subrutina
 
 DISP_RESET4HORASUNDER:
-	LDI R27, 9
-	LDI R17, 1
-	RET
+	LDI R27, 9                   ; Carga R27 con el valor 9
+	LDI R17, 1                   ; Carga R17 con el valor 1
+	RET                           ; Retorna de la subrutina
 
 DISP_RESET7HORASUNDER:
-	LDI R27, 9
-	LDI R17, 0
-	RET
+	LDI R27, 9                   ; Carga R27 con el valor 9
+	LDI R17, 0                   ; Carga R17 con el valor 0
+	RET                           ; Retorna de la subrutina
 
 DISP_RESET6HORASUNDER:
-	LDI R27, 2
-	LDI R17, 2
+	LDI R27, 2                   ; Carga R27 con el valor 2
+	LDI R17, 2                   ; Carga R17 con el valor 2
+	RET                           ; Retorna de la subrutina
 
 DISP_RESETHORASOVER:
-	CPI R27, 3
-	BREQ DISP_RESET5HORASOVER
-	CPI R27, 9
-	BREQ DISP_RESET4HORASOVER
-	INC R27
-	RET
+	CPI R27, 3                   ; Compara si R27 es igual a 3
+	BREQ DISP_RESET5HORASOVER    ; Salta a DISP_RESET5HORASOVER si es igual
+	CPI R27, 9                   ; Compara si R27 es igual a 9
+	BREQ DISP_RESET4HORASOVER    ; Salta a DISP_RESET4HORASOVER si es igual
+	INC R27                      ; Incrementa R27
+	RET                           ; Retorna de la subrutina
 
 DISP_RESET4HORASOVER:
-	INC R17
-	CLR R27
-	RET
+	INC R17                      ; Incrementa R17
+	CLR R27                      ; Borra R27
+	RET                           ; Retorna de la subrutina
+
 DISP_RESET5HORASOVER:
-	CPI R17, 2
-	BREQ DISP_RESET6HORASOVER
-	INC R27
-	RET
+	CPI R17, 2                   ; Compara si R17 es igual a 2
+	BREQ DISP_RESET6HORASOVER    ; Salta a DISP_RESET6HORASOVER si es igual
+	INC R27                      ; Incrementa R27
+	RET                           ; Retorna de la subrutina
 
 DISP_RESET6HORASOVER:
-	LDI R17, 0
-	LDI R27, 0
-	RET
+	LDI R17, 0                   ; Carga R17 con el valor 0
+	LDI R27, 0                   ; Carga R27 con el valor 0
+	RET                           ; Retorna de la subrutina
+
 
 LOOPFECHAX:
 	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
     LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
-    ADD ZL, R21					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R21					 ; Suma R21 al byte bajo de la dirección de la tabla de 7 segmentos
     LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
     OUT PORTD, R1               ; Muestra el valor en el puerto D
     LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0111
@@ -512,30 +526,31 @@ LOOPFECHAX:
 
 	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
     LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
-    ADD ZL, R23					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R23					 ; Suma R23 al byte bajo de la dirección de la tabla de 7 segmentos
     LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
     OUT PORTD, R1               ; Muestra el valor en el puerto D
-	LDI R30, 0b0001_0011
+	LDI R30, 0b0001_0010
 	OUT PORTB, R30
 	CALL DELAY
-	LDI R30, 0b0000_0011
+	LDI R30, 0b0000_0010
 	OUT PORTB, R30
 	CLR ZL
 
 	CLR R1
 	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
     LDI ZL, LOW(TABLA7SEG << 1)  ; Carga el byte bajo de la dirección de la tabla de 7 segmentos
-    ADD ZL, R28					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
+    ADD ZL, R28					 ; Suma R28 al byte bajo de la dirección de la tabla de 7 segmentos
     LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
     OUT PORTD, R1               ; Muestra el valor en el puerto D
-	LDI R30, 0b0000_1000
+	LDI R30, 0b0000_1010
 	OUT PORTB, R30
 	CALL DELAY
-	LDI R30, 0b0000_0000
+	LDI R30, 0b0000_0010
 	OUT PORTB, R30
 	CLR ZL
 	CLR R1
 	RJMP LOOPCOMPAREMODE
+
 LOOPDIASX:
 	// R21, R29, R31 libres
 	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
@@ -543,12 +558,12 @@ LOOPDIASX:
     ADD ZL, R21					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
     LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
     OUT PORTD, R1               ; Muestra el valor en el puerto D
-    LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0111
+    LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0011_0011
     OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
-	LDI R30, 0b0011_1011         ; Carga R30 con el valor binario 0000_0111
+	LDI R30, 0b0011_1011         ; Carga R30 con el valor binario 0011_1011
     OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
 	CALL DELAY
-	LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0011
+	LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0011_0011
     OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
 	CLR ZL
 	
@@ -597,223 +612,235 @@ DISPUNDERDIAS:
 
 // R23 DECENAS DE MESES R28 UNIDADES DE MESES
 DISP_RESETDIASUNDER:
-	CPI R28, 0
-	BREQ DISP_RESET_DIAS_UNDER1
-	CPI R28, 1
-	BREQ DISP_RESET_DIAS_UNDER2
+	CPI R28, 0                   ; Compara si R28 es igual a 0
+	BREQ DISP_RESET_DIAS_UNDER1  ; Salta a DISP_RESET_DIAS_UNDER1 si es igual
+	CPI R28, 1                   ; Compara si R28 es igual a 1
+	BREQ DISP_RESET_DIAS_UNDER2  ; Salta a DISP_RESET_DIAS_UNDER2 si es igual
 
 DISP_RESET_DIAS_UNDER1:
-	CPI R23, 1
-	BREQ DISP_RESET_31DIAS_UNDER
-	CPI R23, 2
-	BREQ DISP_RESET_29DIAS_UNDER
-	CPI R23, 3
-	BREQ DISP_RESET_31DIAS_UNDER
-	CPI R23, 4
-	BREQ DISP_RESET_30DIAS_UNDER
-	CPI R23, 5
-	BREQ DISP_RESET_31DIAS_UNDER
-	CPI R23, 6
-	BREQ DISP_RESET_30DIAS_UNDER
-	CPI R23, 7
-	BREQ DISP_RESET_31DIAS_UNDER
-	CPI R23, 8
-	BREQ DISP_RESET_31DIAS_UNDER
-	CPI R23, 9
-	BREQ DISP_RESET_30DIAS_UNDER
-	RET
+	CPI R23, 1                   ; Compara si R23 es igual a 1
+	BREQ DISP_RESET_31DIAS_UNDER ; Salta a DISP_RESET_31DIAS_UNDER si es igual
+	CPI R23, 2                   ; Compara si R23 es igual a 2
+	BREQ DISP_RESET_29DIAS_UNDER ; Salta a DISP_RESET_29DIAS_UNDER si es igual
+	CPI R23, 3                   ; Compara si R23 es igual a 3
+	BREQ DISP_RESET_31DIAS_UNDER ; Salta a DISP_RESET_31DIAS_UNDER si es igual
+	CPI R23, 4                   ; Compara si R23 es igual a 4
+	BREQ DISP_RESET_30DIAS_UNDER ; Salta a DISP_RESET_30DIAS_UNDER si es igual
+	CPI R23, 5                   ; Compara si R23 es igual a 5
+	BREQ DISP_RESET_31DIAS_UNDER ; Salta a DISP_RESET_31DIAS_UNDER si es igual
+	CPI R23, 6                   ; Compara si R23 es igual a 6
+	BREQ DISP_RESET_30DIAS_UNDER ; Salta a DISP_RESET_30DIAS_UNDER si es igual
+	CPI R23, 7                   ; Compara si R23 es igual a 7
+	BREQ DISP_RESET_31DIAS_UNDER ; Salta a DISP_RESET_31DIAS_UNDER si es igual
+	CPI R23, 8                   ; Compara si R23 es igual a 8
+	BREQ DISP_RESET_31DIAS_UNDER ; Salta a DISP_RESET_31DIAS_UNDER si es igual
+	CPI R23, 9                   ; Compara si R23 es igual a 9
+	BREQ DISP_RESET_30DIAS_UNDER ; Salta a DISP_RESET_30DIAS_UNDER si es igual
+	RET                           ; Retorna
 
 DISP_RESET_DIAS_UNDER2:
-	CPI R23, 0
-	BREQ DISP_RESET_31DIAS_UNDER
-	CPI R23, 1
-	BREQ DISP_RESET_30DIAS_UNDER
-	CPI R23, 2
-	BREQ DISP_RESET_31DIAS_UNDER
+	CPI R23, 0                   ; Compara si R23 es igual a 0
+	BREQ DISP_RESET_31DIAS_UNDER ; Salta a DISP_RESET_31DIAS_UNDER si es igual
+	CPI R23, 1                   ; Compara si R23 es igual a 1
+	BREQ DISP_RESET_30DIAS_UNDER ; Salta a DISP_RESET_30DIAS_UNDER si es igual
+	CPI R23, 2                   ; Compara si R23 es igual a 2
+	BREQ DISP_RESET_31DIAS_UNDER ; Salta a DISP_RESET_31DIAS_UNDER si es igual
+
 
 //*************************************************************************************************************************
 //VERIFICACIÓN DE MES
 //*************************************************************************************************************************
 DISP_RESET_30DIAS_UNDER:
-	CPI R29, 0
-	BREQ SETEAR30_3
-	DEC R21
-	CPI R21, 0xFF
-	BREQ SETEAR30
-	RET
-	SETEAR30:
-	LDI R21, 9
-	DEC R29
-	CPI R29, 0xFF
-	BREQ SETEAR30_2
-	RET
-	SETEAR30_3:
-	CPI R21, 1
-	BREQ SETEAR30_2
-	DEC R21
-	RET
-	SETEAR30_2:
-	LDI R21, 0
-	LDI R29, 3
-	RET
+	CPI R29, 0          ; Compara si R29 es igual a 0
+	BREQ SETEAR30_3     ; Salta a SETEAR30_3 si es igual
+	DEC R21             ; Decrementa R21
+	CPI R21, 0xFF       ; Compara si R21 es igual a 0xFF (255)
+	BREQ SETEAR30       ; Salta a SETEAR30 si es igual
+	RET                 ; Retorna
+
+SETEAR30:
+	LDI R21, 9          ; Carga R21 con el valor 9
+	DEC R29             ; Decrementa R29
+	CPI R29, 0xFF       ; Compara si R29 es igual a 0xFF (255)
+	BREQ SETEAR30_2     ; Salta a SETEAR30_2 si es igual
+	RET                 ; Retorna
+
+SETEAR30_3:
+	CPI R21, 1          ; Compara si R21 es igual a 1
+	BREQ SETEAR30_2     ; Salta a SETEAR30_2 si es igual
+	DEC R21             ; Decrementa R21
+	RET                 ; Retorna
+
+SETEAR30_2:
+	LDI R21, 0          ; Carga R21 con el valor 0
+	LDI R29, 3          ; Carga R29 con el valor 3
+	RET                 ; Retorna
 
 DISP_RESET_31DIAS_UNDER:
-	CPI R29, 0
-	BREQ SETEAR31_3
-	DEC R21
-	CPI R21, 0xFF
-	BREQ SETEAR31
-	RET
-	SETEAR31:
-	LDI R21, 9
-	DEC R29
-	CPI R29, 0xFF
-	BREQ SETEAR31_2
-	RET
-	SETEAR31_3:
-	CPI R21, 1
-	BREQ SETEAR31_2
-	DEC R21
-	RET
-	SETEAR31_2:
-	LDI R21, 1
-	LDI R29, 3
-	RET
+	CPI R29, 0          ; Compara si R29 es igual a 0
+	BREQ SETEAR31_3     ; Salta a SETEAR31_3 si es igual
+	DEC R21             ; Decrementa R21
+	CPI R21, 0xFF       ; Compara si R21 es igual a 0xFF (255)
+	BREQ SETEAR31       ; Salta a SETEAR31 si es igual
+	RET                 ; Retorna
+
+SETEAR31:
+	LDI R21, 9          ; Carga R21 con el valor 9
+	DEC R29             ; Decrementa R29
+	CPI R29, 0xFF       ; Compara si R29 es igual a 0xFF (255)
+	BREQ SETEAR31_2     ; Salta a SETEAR31_2 si es igual
+	RET                 ; Retorna
+
+SETEAR31_3:
+	CPI R21, 1          ; Compara si R21 es igual a 1
+	BREQ SETEAR31_2     ; Salta a SETEAR31_2 si es igual
+	DEC R21             ; Decrementa R21
+	RET                 ; Retorna
+
+SETEAR31_2:
+	LDI R21, 1          ; Carga R21 con el valor 1
+	LDI R29, 3          ; Carga R29 con el valor 3
+	RET                 ; Retorna
 
 DISP_RESET_29DIAS_UNDER:
-	CPI R29, 0
-	BREQ SETEAR29_3
-	DEC R21
-	CPI R21, 0xFF
-	BREQ SETEAR29
-	RET
-	SETEAR29:
-	LDI R21, 9
-	DEC R29
-	CPI R29, 0xFF
-	BREQ SETEAR29_2
-	RET
-	SETEAR29_3:
-	CPI R21, 1
-	BREQ SETEAR29_2
-	DEC R21
-	RET
-	SETEAR29_2:
-	LDI R21, 9
-	LDI R29, 2
-	RET
+	CPI R29, 0          ; Compara si R29 es igual a 0
+	BREQ SETEAR29_3     ; Salta a SETEAR29_3 si es igual
+	DEC R21             ; Decrementa R21
+	CPI R21, 0xFF       ; Compara si R21 es igual a 0xFF (255)
+	BREQ SETEAR29       ; Salta a SETEAR29 si es igual
+	RET                 ; Retorna
+
+SETEAR29:
+	LDI R21, 9          ; Carga R21 con el valor 9
+	DEC R29             ; Decrementa R29
+	CPI R29, 0xFF       ; Compara si R29 es igual a 0xFF (255)
+	BREQ SETEAR29_2     ; Salta a SETEAR29_2 si es igual
+	RET                 ; Retorna
+
+SETEAR29_3:
+	CPI R21, 1          ; Compara si R21 es igual a 1
+	BREQ SETEAR29_2     ; Salta a SETEAR29_2 si es igual
+	DEC R21             ; Decrementa R21
+	RET                 ; Retorna
+
+SETEAR29_2:
+	LDI R21, 9          ; Carga R21 con el valor 9
+	LDI R29, 2          ; Carga R29 con el valor 2
+	RET                 ; Retorna
+
 
 
 
 //**************************************************************************************************************************
 DISP_RESETDIASOVER:
-	CPI R28, 0
-	BREQ DISP_RESET_DIAS_OVER1
-	CPI R28, 1
-	BREQ DISP_RESET_DIAS_OVER2
+	CPI R28, 0                   ; Compara si R28 es igual a 0
+	BREQ DISP_RESET_DIAS_OVER1   ; Salta a DISP_RESET_DIAS_OVER1 si es igual
+	CPI R28, 1                   ; Compara si R28 es igual a 1
+	BREQ DISP_RESET_DIAS_OVER2   ; Salta a DISP_RESET_DIAS_OVER2 si es igual
 
 DISP_RESET_DIAS_OVER1:
-	CPI R23, 1
-	BREQ DISP_RESET_31DIAS_OVER
-	CPI R23, 2
-	BREQ DISP_RESET_29DIAS_OVER
-	CPI R23, 3
-	BREQ DISP_RESET_31DIAS_OVER
-	CPI R23, 4
-	BREQ DISP_RESET_30DIAS_OVER
-	CPI R23, 5
-	BREQ DISP_RESET_31DIAS_OVER
-	CPI R23, 6
-	BREQ DISP_RESET_30DIAS_OVER
-	CPI R23, 7
-	BREQ DISP_RESET_31DIAS_OVER
-	CPI R23, 8
-	BREQ DISP_RESET_31DIAS_OVER
-	CPI R23, 9
-	BREQ DISP_RESET_30DIAS_OVER
-	RET
+	CPI R23, 1                   ; Compara si R23 es igual a 1
+	BREQ DISP_RESET_31DIAS_OVER  ; Salta a DISP_RESET_31DIAS_OVER si es igual
+	CPI R23, 2                   ; Compara si R23 es igual a 2
+	BREQ DISP_RESET_29DIAS_OVER  ; Salta a DISP_RESET_29DIAS_OVER si es igual
+	CPI R23, 3                   ; Compara si R23 es igual a 3
+	BREQ DISP_RESET_31DIAS_OVER  ; Salta a DISP_RESET_31DIAS_OVER si es igual
+	CPI R23, 4                   ; Compara si R23 es igual a 4
+	BREQ DISP_RESET_30DIAS_OVER  ; Salta a DISP_RESET_30DIAS_OVER si es igual
+	CPI R23, 5                   ; Compara si R23 es igual a 5
+	BREQ DISP_RESET_31DIAS_OVER  ; Salta a DISP_RESET_31DIAS_OVER si es igual
+	CPI R23, 6                   ; Compara si R23 es igual a 6
+	BREQ DISP_RESET_30DIAS_OVER  ; Salta a DISP_RESET_30DIAS_OVER si es igual
+	CPI R23, 7                   ; Compara si R23 es igual a 7
+	BREQ DISP_RESET_31DIAS_OVER  ; Salta a DISP_RESET_31DIAS_OVER si es igual
+	CPI R23, 8                   ; Compara si R23 es igual a 8
+	BREQ DISP_RESET_31DIAS_OVER  ; Salta a DISP_RESET_31DIAS_OVER si es igual
+	CPI R23, 9                   ; Compara si R23 es igual a 9
+	BREQ DISP_RESET_30DIAS_OVER  ; Salta a DISP_RESET_30DIAS_OVER si es igual
+	RET                           ; Retorna
 
 DISP_RESET_DIAS_OVER2:
-	CPI R23, 0
-	BREQ DISP_RESET_31DIAS_OVER
-	CPI R23, 1
-	BREQ DISP_RESET_30DIAS_OVER
-	CPI R23, 2
-	BREQ DISP_RESET_31DIAS_OVER
+	CPI R23, 0                   ; Compara si R23 es igual a 0
+	BREQ DISP_RESET_31DIAS_OVER  ; Salta a DISP_RESET_31DIAS_OVER si es igual
+	CPI R23, 1                   ; Compara si R23 es igual a 1
+	BREQ DISP_RESET_30DIAS_OVER  ; Salta a DISP_RESET_30DIAS_OVER si es igual
+	CPI R23, 2                   ; Compara si R23 es igual a 2
+	BREQ DISP_RESET_31DIAS_OVER  ; Salta a DISP_RESET_31DIAS_OVER si es igual
+
 
 //*************************************************************************************************************************
 //VERIFICACIÓN DE MES
 //*************************************************************************************************************************
 DISP_RESET_31DIAS_OVER:
-	CPI R29, 3
-	BREQ DISP_RESET_31DIAS1_OVER
-	CPI R21, 9
-	BREQ DISP_RESET_31DIAS1_OVER
-	INC R21
-	RET
+	CPI R29, 3                   ; Compara si R29 es igual a 3
+	BREQ DISP_RESET_31DIAS1_OVER ; Salta a DISP_RESET_31DIAS1_OVER si es igual
+	CPI R21, 9                   ; Compara si R21 es igual a 9
+	BREQ DISP_RESET_31DIAS1_OVER ; Salta a DISP_RESET_31DIAS1_OVER si es igual
+	INC R21                       ; Incrementa R21
+	RET                           ; Retorna
 
 DISP_RESET_31DIAS1_OVER:
-	CPI R21, 1
-	BREQ DISP_RESET_31DIAS2_OVER
-	CPI R29, 3
-	BREQ DISP_RESET_31DIAS2_OVER
-	LDI R21, 0
-	INC R29
-	RET
+	CPI R21, 1                   ; Compara si R21 es igual a 1
+	BREQ DISP_RESET_31DIAS2_OVER ; Salta a DISP_RESET_31DIAS2_OVER si es igual
+	CPI R29, 3                   ; Compara si R29 es igual a 3
+	BREQ DISP_RESET_31DIAS2_OVER ; Salta a DISP_RESET_31DIAS2_OVER si es igual
+	LDI R21, 0                   ; Carga R21 con el valor 0
+	INC R29                       ; Incrementa R29
+	RET                           ; Retorna
 
 DISP_RESET_31DIAS2_OVER:
-	CPI R21, 1
-	BREQ DISP_RESET_31DIAS4_OVER
-	LDI R21, 1
-	LDI R29, 3
-	RET
+	CPI R21, 1                   ; Compara si R21 es igual a 1
+	BREQ DISP_RESET_31DIAS4_OVER ; Salta a DISP_RESET_31DIAS4_OVER si es igual
+	LDI R21, 1                   ; Carga R21 con el valor 1
+	LDI R29, 3                   ; Carga R29 con el valor 3
+	RET                           ; Retorna
 
 DISP_RESET_31DIAS4_OVER:
-	LDI R21, 1
-	CLR R29
-	RET
+	LDI R21, 1                   ; Carga R21 con el valor 1
+	CLR R29                      ; Borra R29
+	RET                           ; Retorna
 
 DISP_RESET_29DIAS_OVER:
-	CPI R29, 3
-	BREQ DISP_RESET_31DIAS1_OVER
-	CPI R21, 9
-	BREQ DISP_RESET_29DIAS1_OVER
-	INC R21
-	RET
+	CPI R29, 3                   ; Compara si R29 es igual a 3
+	BREQ DISP_RESET_31DIAS1_OVER ; Salta a DISP_RESET_31DIAS1_OVER si es igual
+	CPI R21, 9                   ; Compara si R21 es igual a 9
+	BREQ DISP_RESET_29DIAS1_OVER ; Salta a DISP_RESET_29DIAS1_OVER si es igual
+	INC R21                       ; Incrementa R21
+	RET                           ; Retorna
 
 DISP_RESET_29DIAS1_OVER:
-	CPI R29, 2
-	BREQ DISP_RESET_29DIAS2_OVER
-	LDI R21, 0
-	INC R29
-	RET
+	CPI R29, 2                   ; Compara si R29 es igual a 2
+	BREQ DISP_RESET_29DIAS2_OVER ; Salta a DISP_RESET_29DIAS2_OVER si es igual
+	LDI R21, 0                   ; Carga R21 con el valor 0
+	INC R29                       ; Incrementa R29
+	RET                           ; Retorna
 
 DISP_RESET_29DIAS2_OVER:
-	LDI R21, 1
-	CLR R29
-	RET
+	LDI R21, 1                   ; Carga R21 con el valor 1
+	CLR R29                      ; Borra R29
+	RET                           ; Retorna
 
 DISP_RESET_30DIAS_OVER:
-	CPI R29, 3
-	BREQ DISP_RESET_30DIAS1_OVER
-	CPI R21, 9
-	BREQ DISP_RESET_30DIAS1_OVER
-	INC R21
-	RET
+	CPI R29, 3                   ; Compara si R29 es igual a 3
+	BREQ DISP_RESET_30DIAS1_OVER ; Salta a DISP_RESET_30DIAS1_OVER si es igual
+	CPI R21, 9                   ; Compara si R21 es igual a 9
+	BREQ DISP_RESET_30DIAS1_OVER ; Salta a DISP_RESET_30DIAS1_OVER si es igual
+	INC R21                       ; Incrementa R21
+	RET                           ; Retorna
 
 DISP_RESET_30DIAS1_OVER:
-	CPI R21, 0
-	BREQ DISP_RESET_30DIAS2_OVER
-	CPI R29, 3
-	BREQ DISP_RESET_30DIAS2_OVER
-	LDI R21, 0
-	INC R29
-	RET
+	CPI R21, 0                   ; Compara si R21 es igual a 0
+	BREQ DISP_RESET_30DIAS2_OVER ; Salta a DISP_RESET_30DIAS2_OVER si es igual
+	CPI R29, 3                   ; Compara si R29 es igual a 3
+	BREQ DISP_RESET_30DIAS2_OVER ; Salta a DISP_RESET_30DIAS2_OVER si es igual
+	LDI R21, 0                   ; Carga R21 con el valor 0
+	INC R29                       ; Incrementa R29
+	RET                           ; Retorna
 
 DISP_RESET_30DIAS2_OVER:
-	LDI R21, 1
-	CLR R29
-	RET
+	LDI R21, 1                   ; Carga R21 con el valor 1
+	CLR R29                      ; Borra R29
+	RET                           ; Retorna
 
 LOOPMESESX:
 	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
@@ -821,10 +848,10 @@ LOOPMESESX:
     ADD ZL, R23					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
     LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
     OUT PORTD, R1               ; Muestra el valor en el puerto D
-	LDI R30, 0b0001_0011
+	LDI R30, 0b0001_0010
 	OUT PORTB, R30
 	CALL DELAY
-	LDI R30, 0b0000_0011
+	LDI R30, 0b0000_0010
 	OUT PORTB, R30
 	CLR ZL
 
@@ -834,10 +861,10 @@ LOOPMESESX:
     ADD ZL, R28					 ; Suma R17 al byte bajo de la dirección de la tabla de 7 segmentos
     LPM R1, Z                   ; Lee el byte de la tabla de 7 segmentos en la dirección calculada
     OUT PORTD, R1               ; Muestra el valor en el puerto D
-	LDI R30, 0b0000_1000
+	LDI R30, 0b0000_1010
 	OUT PORTB, R30
 	CALL DELAY
-	LDI R30, 0b0000_0000
+	LDI R30, 0b0000_0010
 	OUT PORTB, R30
 	CLR ZL
 	CLR R1
@@ -871,61 +898,62 @@ DISPUNDERMESES:
 	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
 
 DISP_RESETMESESUNDER:
-	LDI R21, 1
-	CLR R29
-	CPI R23, 1
-	BREQ DISP_RESET5MESESUNDER
-	CPI R23, 0
-	BREQ DISP_RESET8MESESUNDER
-	DEC R23
-	RET
+	LDI R21, 1            ; Carga R21 con el valor 1
+	CLR R29               ; Borra R29
+	CPI R23, 1            ; Compara si R23 es igual a 1
+	BREQ DISP_RESET5MESESUNDER  ; Salta a DISP_RESET5MESESUNDER si es igual
+	CPI R23, 0            ; Compara si R23 es igual a 0
+	BREQ DISP_RESET8MESESUNDER  ; Salta a DISP_RESET8MESESUNDER si es igual
+	DEC R23               ; Decrementa R23
+	RET                    ; Retorna
 
 DISP_RESET5MESESUNDER:
-	CPI R28, 1
-	BREQ DISP_RESET7MESESUNDER
-	CPI R28, 0
-	BREQ  DISP_RESET6MESESUNDER
-	RET
+	CPI R28, 1            ; Compara si R28 es igual a 1
+	BREQ DISP_RESET7MESESUNDER  ; Salta a DISP_RESET7MESESUNDER si es igual
+	CPI R28, 0            ; Compara si R28 es igual a 0
+	BREQ DISP_RESET6MESESUNDER  ; Salta a DISP_RESET6MESESUNDER si es igual
+	RET                    ; Retorna
 
 DISP_RESET7MESESUNDER:
-	LDI R23, 0
-	LDI R28, 1
-	RET
+	LDI R23, 0            ; Carga R23 con el valor 0
+	LDI R28, 1            ; Carga R28 con el valor 1
+	RET                    ; Retorna
 
 DISP_RESET8MESESUNDER:
-	LDI R23, 9
-	LDI R28, 0
-	RET
+	LDI R23, 9            ; Carga R23 con el valor 9
+	LDI R28, 0            ; Carga R28 con el valor 0
+	RET                    ; Retorna
 
 DISP_RESET6MESESUNDER:
-	LDI R23, 1
-	LDI R28, 1
+	LDI R23, 1            ; Carga R23 con el valor 1
+	LDI R28, 1            ; Carga R28 con el valor 1
 
 DISP_RESETMESESOVER:
-	LDI R21, 1
-	CLR R29
-	CPI R23, 2
-	BREQ DISP_RESET5MESESOVER
-	CPI R23, 9
-	BREQ DISP_RESET4MESESOVER
-	INC R23
-	RET
+	LDI R21, 1            ; Carga R21 con el valor 1
+	CLR R29               ; Borra R29
+	CPI R23, 2            ; Compara si R23 es igual a 2
+	BREQ DISP_RESET5MESESOVER  ; Salta a DISP_RESET5MESESOVER si es igual
+	CPI R23, 9            ; Compara si R23 es igual a 9
+	BREQ DISP_RESET4MESESOVER  ; Salta a DISP_RESET4MESESOVER si es igual
+	INC R23               ; Incrementa R23
+	RET                    ; Retorna
 
 DISP_RESET4MESESOVER:
-	INC R28
-	CLR R23
-	RET
+	INC R28               ; Incrementa R28
+	CLR R23               ; Borra R23
+	RET                    ; Retorna
 
 DISP_RESET5MESESOVER:
-	CPI R28, 1
-	BREQ DISP_RESET6MESESOVER
-	INC R23
-	RET
+	CPI R28, 1            ; Compara si R28 es igual a 1
+	BREQ DISP_RESET6MESESOVER  ; Salta a DISP_RESET6MESESOVER si es igual
+	INC R23               ; Incrementa R23
+	RET                    ; Retorna
 
 DISP_RESET6MESESOVER:
-	LDI R28, 0
-	LDI R23, 1
-	RET
+	LDI R28, 0            ; Carga R28 con el valor 0
+	LDI R23, 1            ; Carga R23 con el valor 1
+	RET                    ; Retorna
+
 
 LOOPALARMAX:
 	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
@@ -935,10 +963,10 @@ LOOPALARMAX:
     OUT PORTD, R1               ; Muestra el valor en el puerto D
     LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0111
     OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
-	LDI R30, 0b0000_1000
+	LDI R30, 0b0000_1011
 	OUT PORTB, R30
 	CALL DELAY
-	LDI R30, 0b0000_0000
+	LDI R30, 0b0000_0011
 	OUT PORTB, R30
 	CLR ZL
 	
@@ -950,10 +978,10 @@ LOOPALARMAX:
     OUT PORTD, R1               ; Muestra el valor en el puerto D SEGUNDO DISPLAY
     LDI R30, 0b0011_0011         ; Carga R29 con el valor binario 0000_1011
     OUT PORTC, R30               ; Muestra el valor de R29 en el puerto C
-	LDI R30, 0b0001_0000
+	LDI R30, 0b0001_0011
 	OUT PORTB, R30
 	CALL DELAY
-	LDI R30, 0b0000_0000
+	LDI R30, 0b0000_0011
 	OUT PORTB, R30
 	CLR ZL
 	CLR R1
@@ -992,10 +1020,10 @@ LOOPALARMAMINSX:
     OUT PORTD, R1               ; Muestra el valor en el puerto D
     LDI R30, 0b0011_0011         ; Carga R30 con el valor binario 0000_0111
     OUT PORTC, R30               ; Muestra el valor de R30 en el puerto C
-	LDI R30, 0b0000_1000
+	LDI R30, 0b0000_1011
 	OUT PORTB, R30
 	CALL DELAY
-	LDI R30, 0b0000_0000
+	LDI R30, 0b0000_0011
 	OUT PORTB, R30
 	CLR ZL
 	
@@ -1007,10 +1035,10 @@ LOOPALARMAMINSX:
     OUT PORTD, R1               ; Muestra el valor en el puerto D SEGUNDO DISPLAY
     LDI R30, 0b0011_0011         ; Carga R29 con el valor binario 0000_1011
     OUT PORTC, R30               ; Muestra el valor de R29 en el puerto C
-	LDI R30, 0b0001_0000
+	LDI R30, 0b0001_0011
 	OUT PORTB, R30
 	CALL DELAY
-	LDI R30, 0b0000_0000
+	LDI R30, 0b0000_0011
 	OUT PORTB, R30
 	CLR ZL
 	CLR R1
@@ -1043,64 +1071,65 @@ DISPUNDERMINSA:
 	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
 
 DISP_RESETMINSUNDERA:
-	MOV R31, R5
-	CPI R31, 0
-	BREQ SETEARM_3A
-	DEC R4
-	MOV R31, R4
-	CPI R31, 0xFF
-	BREQ SETEARMA
-	RET
+	MOV R31, R5            ; Mueve el valor de R5 a R31
+	CPI R31, 0             ; Compara R31 con 0
+	BREQ SETEARM_3A        ; Salta a SETEARM_3A si es igual
+	DEC R4                 ; Decrementa R4
+	MOV R31, R4            ; Mueve el valor de R4 a R31
+	CPI R31, 0xFF          ; Compara R31 con 255
+	BREQ SETEARMA          ; Salta a SETEARMA si es igual
+	RET                     ; Retorna
 	SETEARMA:
-	LDI R31, 9
-	MOV R4, R31
-	DEC R5
-	MOV R31, R5
-	CPI R31, 0xFF
-	BREQ SETEARM_2A
-	RET
+	LDI R31, 9             ; Carga 9 en R31
+	MOV R4, R31            ; Mueve el valor de R31 a R4
+	DEC R5                 ; Decrementa R5
+	MOV R31, R5            ; Mueve el valor de R5 a R31
+	CPI R31, 0xFF          ; Compara R31 con 255
+	BREQ SETEARM_2A        ; Salta a SETEARM_2A si es igual
+	RET                     ; Retorna
 	SETEARM_3A:
-	MOV R31, R4
-	CPI R31, 0
-	BREQ SETEARM_2A
-	DEC R4
-	RET
+	MOV R31, R4            ; Mueve el valor de R4 a R31
+	CPI R31, 0             ; Compara R31 con 0
+	BREQ SETEARM_2A        ; Salta a SETEARM_2A si es igual
+	DEC R4                 ; Decrementa R4
+	RET                     ; Retorna
 	SETEARM_2A:
-	LDI R31, 9
-	MOV R4, R31
-	LDI R31, 5
-	MOV R5, R31
-	RET
+	LDI R31, 9             ; Carga 9 en R31
+	MOV R4, R31            ; Mueve el valor de R31 a R4
+	LDI R31, 5             ; Carga 5 en R31
+	MOV R5, R31            ; Mueve el valor de R31 a R5
+	RET                     ; Retorna
 
 DISP_RESETMINSOVERA:
-	MOV R31, R5
-	CPI R31, 5
-	BREQ SETEARM_3AO
-	INC R4
-	MOV R31, R4
-	CPI R31, 10
-	BREQ SETEARMAO
-	RET
+	MOV R31, R5            ; Mueve el valor de R5 a R31
+	CPI R31, 5             ; Compara R31 con 5
+	BREQ SETEARM_3AO       ; Salta a SETEARM_3AO si es igual
+	INC R4                 ; Incrementa R4
+	MOV R31, R4            ; Mueve el valor de R4 a R31
+	CPI R31, 10            ; Compara R31 con 10
+	BREQ SETEARMAO         ; Salta a SETEARMAO si es igual
+	RET                     ; Retorna
 	SETEARMAO:
-	LDI R31, 0
-	MOV R4, R31
-	INC R5
-	MOV R31, R5
-	CPI R31, 10
-	BREQ SETEARM_2AO
-	RET
+	LDI R31, 0             ; Carga 0 en R31
+	MOV R4, R31            ; Mueve el valor de R31 a R4
+	INC R5                 ; Incrementa R5
+	MOV R31, R5            ; Mueve el valor de R5 a R31
+	CPI R31, 10            ; Compara R31 con 10
+	BREQ SETEARM_2AO       ; Salta a SETEARM_2AO si es igual
+	RET                     ; Retorna
 	SETEARM_3AO:
-	MOV R31, R4
-	CPI R31, 9
-	BREQ SETEARM_2AO
-	INC R4
-	RET
+	MOV R31, R4            ; Mueve el valor de R4 a R31
+	CPI R31, 9             ; Compara R31 con 9
+	BREQ SETEARM_2AO       ; Salta a SETEARM_2AO si es igual
+	INC R4                 ; Incrementa R4
+	RET                     ; Retorna
 	SETEARM_2AO:
-	LDI R31, 0
-	MOV R4, R31
-	LDI R31, 0
-	MOV R5, R31
-	RET
+	LDI R31, 0             ; Carga 0 en R31
+	MOV R4, R31            ; Mueve el valor de R31 a R4
+	LDI R31, 0             ; Carga 0 en R31
+	MOV R5, R31            ; Mueve el valor de R31 a R5
+	RET                     ; Retorna
+
 
 LOOPALARMAHORASX:
 	LDI ZH, HIGH(TABLA7SEG << 1) ; Carga el byte alto de la dirección de la tabla de 7 segmentos
@@ -1158,87 +1187,69 @@ DISPUNDERHORASA:
 	RJMP LOOPCOMPAREMODE			 ; Salta a la etiqueta LOOPCOMPAREMODE
 
 DISP_RESETHORASUNDERA:
-	CPI R22, 0
-	BREQ SETEAR_3A
-	DEC R3
-	MOV R31, R3
-	CPI R31, 0xFF
-	BREQ SETEARA
-	RET
+	CPI R22, 0           ; Compara R22 con 0
+	BREQ SETEAR_3A       ; Salta a SETEAR_3A si es igual
+	DEC R3               ; Decrementa R3
+	MOV R31, R3          ; Mueve el valor de R3 a R31
+	CPI R31, 0xFF        ; Compara R31 con 255
+	BREQ SETEARA         ; Salta a SETEARA si es igual
+	RET                   ; Retorna
 	SETEARA:
-	LDI R31, 9
-	MOV R3, R31
-	DEC R22
-	CPI R22, 0xFF
-	BREQ SETEAR_2A
-	RET
+	LDI R31, 9           ; Carga 9 en R31
+	MOV R3, R31          ; Mueve el valor de R31 a R3
+	DEC R22              ; Decrementa R22
+	CPI R22, 0xFF        ; Compara R22 con 255
+	BREQ SETEAR_2A       ; Salta a SETEAR_2A si es igual
+	RET                   ; Retorna
 	SETEAR_3A:
-	MOV R31, R3
-	CPI R31, 0
-	BREQ SETEAR_2A
-	DEC R3
-	RET
+	MOV R31, R3          ; Mueve el valor de R3 a R31
+	CPI R31, 0           ; Compara R31 con 0
+	BREQ SETEAR_2A       ; Salta a SETEAR_2A si es igual
+	DEC R3               ; Decrementa R3
+	RET                   ; Retorna
 	SETEAR_2A:
-	LDI R31, 3
-	MOV R3, R31
-	LDI R22, 2
-	RET
+	LDI R31, 3           ; Carga 3 en R31
+	MOV R3, R31          ; Mueve el valor de R31 a R3
+	LDI R22, 2           ; Carga 2 en R22
+	RET                   ; Retorna
 
 DISP_RESETHORASOVERA: 
-	CPI R22, 2
-	BREQ SETEAR_3AO
-	INC R3
-	MOV R31, R3
-	CPI R31, 10
-	BREQ SETEARAO
-	RET
+	CPI R22, 2           ; Compara R22 con 2
+	BREQ SETEAR_3AO      ; Salta a SETEAR_3AO si es igual
+	INC R3               ; Incrementa R3
+	MOV R31, R3          ; Mueve el valor de R3 a R31
+	CPI R31, 10          ; Compara R31 con 10
+	BREQ SETEARAO        ; Salta a SETEARAO si es igual
+	RET                   ; Retorna
 	SETEARAO:
-	LDI R31, 0
-	MOV R3, R31
-	INC R22
-	CPI R22, 10
-	BREQ SETEAR_2AO
-	RET
+	LDI R31, 0           ; Carga 0 en R31
+	MOV R3, R31          ; Mueve el valor de R31 a R3
+	INC R22              ; Incrementa R22
+	CPI R22, 10          ; Compara R22 con 10
+	BREQ SETEAR_2AO      ; Salta a SETEAR_2AO si es igual
+	RET                   ; Retorna
 	SETEAR_3AO:
-	MOV R31, R3
-	CPI R31, 3
-	BREQ SETEAR_2AO
-	INC R3
-	RET
+	MOV R31, R3          ; Mueve el valor de R3 a R31
+	CPI R31, 3           ; Compara R31 con 3
+	BREQ SETEAR_2AO      ; Salta a SETEAR_2AO si es igual
+	INC R3               ; Incrementa R3
+	RET                   ; Retorna
 	SETEAR_2AO:
-	LDI R31, 0
-	MOV R3, R31
-	LDI R22, 0
-	RET
+	LDI R31, 0           ; Carga 0 en R31
+	MOV R3, R31          ; Mueve el valor de R31 a R3
+	LDI R22, 0           ; Carga 0 en R22
+	RET                   ; Retorna
 
 LOOPDESALARMAX:	//DESACTIVAR ALARMA
-	SBI PINB, PB0
-	SBI PINB, PB1
-	SBI PINB, PB2
-	CP R5, R26
-	BRNE ALARMA_ACTIVA1
-	RJMP LOOPCOMPAREMODE
-	ALARMA_ACTIVA1DES:
-	CP R4, R24
-	BRNE ALARMA_ACTIVA2
-	RJMP LOOPCOMPAREMODE
-	ALARMA_ACTIVA2DES:
-	CP R3, 27
-	BRNE ALARMA_ACTIVA3
-	RJMP LOOPCOMPAREMODE
-	ALARMA_ACTIVA3DES:
-	CP R22, 17
-	BRNE ALARMA_ACTIVA4
-	RJMP LOOPCOMPAREMODE
-	ALARMA_ACTIVA4DES:
-	SBI PINB, PB2
-	RJMP LOOPCOMPAREMODE
+	LDI R31, 0b0000_0011   ; Carga 0000_0011 en R31
+	OUT PORTB, R31          ; Envia el valor en R31 al puerto B
+	RJMP LOOPCOMPAREMODE    ; Salto incondicional a LOOPCOMPAREMODE
+
 	
 ISR_PCINT0:
     PUSH R16                      ; Almacena R16 en la pila
     IN R16, SREG                  ; Lee el registro de estado y almacena en R16
     PUSH R16                      ; Almacena R16 en la pila
-
     IN R18, PINC                   ; Lee el estado actual de los pines del puerto C
     SBRS R18, PC0                   ; Salta si el bit PC0 ha cambiado
     RJMP CHECKPC1                  ; Salta a la etiqueta CHECKPC1
@@ -1248,7 +1259,10 @@ ISR_PCINT0:
 
 CHECKPC1:
 	CPI R20, 0
-	BREQ RESETCHANGEMODEUNDER
+	BRGE MAYOR0
+	LDI R20, 9
+	RETI
+MAYOR0:
     SBRS R18, PC1                  ; Salta si el bit PC1 ha cambiado
     JMP CHANGEMODE                     ; Salta a la etiqueta CHANGEMODE
     DEC R20                        ; Decrementa R20 (variable de control)
@@ -1267,11 +1281,7 @@ CHANGEMODE:
     POP R16                        ; Restaura R16 desde la pila
     OUT SREG, R16                  ; Restaura el registro de estado desde R16
     POP R16                        ; Restaura R16 desde la pila
-    RETI                            ; Retorna de la interrupción
-
-RESETCHANGEMODEUNDER:
-	LDI R20, 9
-	RETI
+    RETI                           ; Retorna de la interrupción
 
 RESETCHANGEMODEOVER:
 	LDI R20, 0
@@ -1286,7 +1296,7 @@ Timer0:
     RET                                   ; Retorna de la subrutina
 
 DELAY:
-    LDI R16, 100            ; Inicializa delay
+    LDI R16, 255            ; Inicializa delay
     delay1:
         DEC R16              ; Decrementa el contador
 		CPI R16, 0
